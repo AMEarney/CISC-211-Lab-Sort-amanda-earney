@@ -12,7 +12,7 @@
 .type nameStr,%gnu_unique_object
     
 /*** STUDENTS: Change the next line to your name!  **/
-nameStr: .asciz "Inigo Montoya"  
+nameStr: .asciz "Amanda Earney"  
 
 .align   /* realign so that next mem allocations are on word boundaries */
  
@@ -74,9 +74,109 @@ asmSwap:
     /* REMEMBER TO FOLLOW THE ARM CALLING CONVENTION!            */
 
     /* YOUR asmSwap CODE BELOW THIS LINE! VVVVVVVVVVVVVVVVVVVVV  */
+    push {r4-r11, LR}
 
-
-
+    LDR r4, =0
+    CMP r1, r4 /* checks for signed or unsigned numbers */
+    BEQ checkUnsignedSize
+    B checkSignedSize
+    
+checkUnsignedSize:
+    LDR r4, =1
+    CMP r2, r4 /* checks if the size is 1 byte */
+    BEQ unsignedByte
+    LDR r4, =2
+    CMP r2, r4 /* checks if the size is a halfword */
+    BEQ unsignedHalfword
+    LDR r5, [r0] /* gets the value of v1 in r5 */
+    LDR r6, [r0, 4] /* gets the value of v2 in r6 without incrementing r0 */
+    B checkUnsignedValues
+    
+unsignedByte:
+    LDRB r5, [r0] /* puts the correctly sized value of v1 into r5 */
+    LDRB r6, [r0, 4] /* puts v2 into r6 without incrementing r0 */
+    B checkUnsignedValues
+    
+unsignedHalfword:
+    LDRH r5, [r0] /* puts the correctly sized value of v1 into r5 */
+    LDRH r6, [r0, 4] /* puts v2 into r6 without incrementing r0 */
+    B checkUnsignedValues
+    
+checkSignedSize:
+    LDR r4, =1
+    CMP r2, r4 /* checks if the size is 1 byte */
+    BEQ signedByte
+    LDR r4, =2
+    CMP r2, r4 /* checks if the size is a halfword */
+    BEQ signedHalfword
+    LDR r5, [r0] /* gets the value of v1 in r5 */
+    LDR r6, [r0, 4] /* gets the value of v2 in r6 without incrementing r0 */
+    B checkSignedValues
+    
+signedByte:
+    LDRSB r5, [r0] /* puts the correctly sized value of v1 into r5 with sign extension */
+    LDRSB r6, [r0, 4] /* puts v2 into r6 without incrementing r0 */
+    B checkSignedValues
+    
+signedHalfword:
+    LDRSH r5, [r0] /* puts the correctly sized value of v1 into r5 with sign extension */
+    LDRSH r6, [r0, 4] /* puts v2 into r6 without incrementing r0 */
+    B checkSignedValues
+    
+checkUnsignedValues:
+    LDR r4, =0
+    CMP r5, r4 /* checks if v1 is 0 */
+    CMPNE r6, r4 /* if v1 != 0, checks if v2 is 0 */
+    MOVEQ r0, -1 /* if either is 0, puts -1 in return register */
+    BEQ exitSwap 
+    CMP r5, r6 /* checks which value is greater */
+    MOVLS r0, 0 /* if v1 is less than or equal to v2, puts 0 in return register */
+    BLS exitSwap /* using LS because of unsigned values */
+    B swapValues /* if got here, values should be swapped */
+    
+checkSignedValues:
+    LDR r4, =0
+    CMP r5, r4 /* checks if v1 is 0 */
+    CMPNE r6, r4 /* if v1 != 0, checks if v2 is 0 */
+    MOVEQ r0, -1 /* if either is 0, puts -1 in return register */
+    BEQ exitSwap
+    CMP r5, r6 /* checks which value is greater */
+    MOVLE r0, 0 /* if v1 is less than or equal to v2, puts 0 in return register */
+    BLE exitSwap /* using LE because of signed values */
+    B swapValues /* if got here, values should be swapped */
+    
+swapValues:
+    MOV r7, r5 /* stores value of v1 into a temporary register */
+    MOV r5, r6 /* overrides value of v1 with value of v2 */
+    MOV r6, r7 /* overrides value of v2 with stored value of v1 */
+    LDR r4, =1
+    CMP r2, r4 /* checks if size of values are 1 byte */
+    BEQ storeBytes
+    LDR r4, =2 
+    CMP r2, r4 /* checks if size of values are a halfword */
+    BEQ storeHalfwords
+    STR r5, [r0] /* stores lower value into first address */
+    STR r6, [r0, 4] /* stores higher value into second address */
+    /* not autoindexing for consistency with instances without swapping */
+    MOV r0, 1
+    B exitSwap
+    
+storeBytes:
+    STRB r5, [r0] /* stores lower value into first address */
+    STRB r6, [r0, 4] /* stores higher value into second address */
+    /* not autoindexing for consistency with instances without swapping */
+    MOV r0, 1
+    B exitSwap
+    
+storeHalfwords:
+    STRH r5, [r0] /* stores lower value into first address */
+    STRH r6, [r0, 4] /* stores higher value into second address */
+    /* not autoindexing for consistency with instances without swapping */
+    MOV r0, 1
+    
+exitSwap:
+    pop {r4-r11, LR}
+    BX LR
     /* YOUR asmSwap CODE ABOVE THIS LINE! ^^^^^^^^^^^^^^^^^^^^^  */
     
     
@@ -113,9 +213,37 @@ asmSort:
     /* REMEMBER TO FOLLOW THE ARM CALLING CONVENTION!            */
 
     /* YOUR asmSort CODE BELOW THIS LINE! VVVVVVVVVVVVVVVVVVVVV  */
+    push {r4-r11, LR}
 
-
-
+    LDR r4, =0 /* r4 will store the swap amount */
+    MOV r5, r0 /* a copy of the start address will be stored in r5 */
+    MOV r6, r0 /* puts a copy of the input address into r6 to increment */
+    LDR r7, =1 /* values for checking results of swap */
+    LDR r8, =-1 
+    LDR r9, =1 /* r9 holds a boolean for if a swap happened */
+    
+sortLoop:
+    CMP r9, r7 
+    BNE exitSort /* if r9 is still 0, a swap never happened */
+    LDR r9, =0 /* resets swap happened boolean to 0 */
+    MOV r0, r5 /* resets the address input to the start address */
+    MOV r6, r5 /* resets the incremented input address */
+    
+sortSwap:
+    BL asmSwap
+    CMP r0, r7 /* checks if values were swapped */
+    LDREQ r9, =1 /* sets bool to true if swapped */
+    ADDEQ r4, r4, 1 /* increments swap amount by 1 if swapped */
+    CMP r0, r8 /* checks if either value was 0 */
+    BEQ sortLoop /* restarts outer loop if a value was 0 */
+    ADD r6, r6, 4 /* increments the input address */
+    MOV r0, r6 /* moves the incremented input address into r0 */
+    B sortSwap /* checks the next 2 values */
+    
+exitSort:
+    MOV r0, r4 /* puts the swap amount into the return register */
+    pop {r4-r11, LR}
+    BX LR
     /* YOUR asmSort CODE ABOVE THIS LINE! ^^^^^^^^^^^^^^^^^^^^^  */
 
    
